@@ -1,0 +1,14 @@
+{
+	"name": "function_pipes",
+	"build": {
+		"dockerfile": "../Dockerfile"
+	},
+	"extensions": [	
+		"ms-vscode.test-adapter-converter",
+		"bungcip.better-toml",
+		"ms-python.python",
+		"ms-python.vscode-pylance",
+		"ms-azuretools.vscode-docker",
+		"valentjn.vscode-ltex"
+	]
+}
