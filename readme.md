@@ -1,0 +1,1 @@
+# Auto poetry template

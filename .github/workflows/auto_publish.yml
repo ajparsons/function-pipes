@@ -1,0 +1,93 @@
+# Tools to publish package to pypi automatically
+# on update of poetry version.
+# Will also update tags on automatic release.
+
+name: "Publish package"
+
+# don't allow multiple 'identical' processes to run. A second push should cancel the job from the first one.
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ github.event.inputs.pypi }}-${{ github.event.inputs.testpypi }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+        pypi:
+          description: Force to pypi
+          type: boolean
+          default: false
+        testpypi:
+          description: Force to testpypi
+          type: boolean
+          default: false
+  push:
+    branches: [main]
+
+jobs:
+
+# run the tests first, if this fails nothing continues
+  test:
+    uses: ./.github/workflows/test.yml
+
+  # run auto either if nothing explicit forced in workflow or it is a push event
+  publish-auto:
+    if: ${{ (github.event.inputs.testpypi == 'false' && github.event.inputs.pypi == 'false') || github.event_name == 'push' }}
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v2
+
+      - name: Fetch repo name
+        id: repo_name
+        run: echo "::set-output name=value::$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')"
+
+      - id: get_status
+        name: get_status
+        uses: ajparsons/compare-pypi-poetry-version@v1
+        with:
+         package_name: ${{ steps.repo_name.outputs.value }}
+
+      - name: Update git tags
+        if: ${{ steps.get_status.outputs.remote_exists == 'true' && steps.get_status.outputs.version_difference == 'true'}}
+        shell: bash
+        run: |
+            git config --global user.email "action@github.com"
+            git config --global user.name "GitHub Action"
+            git tag -f -a -m "Latest release" "latest"
+            for val in $TAGS; do
+              git tag -f -a -m "Release for $val" "$val"
+            done
+            git push -f --tags
+        env:
+          TAGS: ${{ steps.get_status.outputs.version_tags }}
+
+      - name: Build and publish to pypi
+        if: ${{ steps.get_status.outputs.remote_exists == 'true' && steps.get_status.outputs.version_difference == 'true'}}
+        uses: JRubics/poetry-publish@v1.11
+        with:
+          pypi_token: ${{ secrets.PYPI_TOKEN }}
+
+  # run manual if one of the boolean buttons for workflow was used
+  # this can force the initial creation of the package
+  publish-manual:
+    if: ${{ github.event.inputs.testpypi == 'true' || github.event.inputs.pypi == 'true' }}
+    needs: test 
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v2
+
+      - name: Build and publish to pypi
+        if: ${{ github.event.inputs.pypi == 'true' }}
+        uses: JRubics/poetry-publish@v1.11
+        with:
+          pypi_token: ${{ secrets.PYPI_TOKEN }}
+
+      - name: Build and publish to testpypi
+        if: ${{ github.event.inputs.testpypi == 'true' }}
+        uses: JRubics/poetry-publish@v1.11
+        with:
+          pypi_token: ${{ secrets.TEST_PYPI_TOKEN }}
+          repository_name: "testpypi"
+          repository_url: "https://test.pypi.org/legacy/"
