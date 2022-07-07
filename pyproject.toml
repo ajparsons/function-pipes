@@ -14,10 +14,6 @@ include = [
 [tool.poetry.dependencies]
 python = "^3.8"
 
-[tool.poetry.group.dev.dependencies]
-j2cli = "^0.3.10"
-pytest-pyright = "^0.0.2"
-
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
 pytest-cov = "^3.0.0"
@@ -25,6 +21,8 @@ pylint = "^2.12.2"
 black = "^22.3.0"
 pyright = "^1.1"
 toml = "^0.10.2"
+j2cli = "^0.3.10"
+pytest-pyright = "^0.0.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
