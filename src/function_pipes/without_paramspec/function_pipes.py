@@ -22,7 +22,7 @@ from ast import (
 from inspect import getsource
 from itertools import takewhile
 from textwrap import dedent
-from typing import Any, Callable, TypeVar, overload
+from typing import Any, Union, Callable, TypeVar, overload
 
 
 T = TypeVar("T")
@@ -36,8 +36,8 @@ class _LambdaExtractor(NodeTransformer):
     def __init__(
         self,
         _lambda: Lambda,
-        value: expr | Call,
-        subsequent_value: expr | Call | None = None,
+        value: Union[expr, Call],
+        subsequent_value: Union[expr, Call, None] = None,
     ):
         self._lambda = _lambda
         self.arg_name = self._lambda.args.args[0].arg  # type: ignore
@@ -266,7 +266,7 @@ InputVal = TypeVar("InputVal")
 
 # Always overridden by the overloads but is
 # self consistent in the declared function
-stand_in_callable = Callable[..., Any] | None
+stand_in_callable = Union[Callable[..., Any], None]
 
 
 Out0 = TypeVar("Out0")
@@ -1038,7 +1038,7 @@ def pipeline(
     ...
 
 
-def pipeline(op0: Callable[..., Out0], op1: Callable[[Out0], Out1] | None = None, op2: Callable[[Out1], Out2] | None = None, op3: Callable[[Out2], Out3] | None = None, op4: Callable[[Out3], Out4] | None = None, op5: Callable[[Out4], Out5] | None = None, op6: Callable[[Out5], Out6] | None = None, op7: Callable[[Out6], Out7] | None = None, op8: Callable[[Out7], Out8] | None = None, op9: Callable[[Out8], Out9] | None = None, op10: Callable[[Out9], Out10] | None = None, op11: Callable[[Out10], Out11] | None = None, op12: Callable[[Out11], Out12] | None = None, op13: Callable[[Out12], Out13] | None = None, op14: Callable[[Out13], Out14] | None = None, op15: Callable[[Out14], Out15] | None = None, op16: Callable[[Out15], Out16] | None = None, op17: Callable[[Out16], Out17] | None = None, op18: Callable[[Out17], Out18] | None = None, op19: Callable[[Out18], Out19] | None = None, /) -> Callable[..., Any]:  # type: ignore
+def pipeline(op0: Callable[..., Out0], op1: Union[Callable[[Out0], Out1], None] = None, op2: Union[Callable[[Out1], Out2], None] = None, op3: Union[Callable[[Out2], Out3], None] = None, op4: Union[Callable[[Out3], Out4], None] = None, op5: Union[Callable[[Out4], Out5], None] = None, op6: Union[Callable[[Out5], Out6], None] = None, op7: Union[Callable[[Out6], Out7], None] = None, op8: Union[Callable[[Out7], Out8], None] = None, op9: Union[Callable[[Out8], Out9], None] = None, op10: Union[Callable[[Out9], Out10], None] = None, op11: Union[Callable[[Out10], Out11], None] = None, op12: Union[Callable[[Out11], Out12], None] = None, op13: Union[Callable[[Out12], Out13], None] = None, op14: Union[Callable[[Out13], Out14], None] = None, op15: Union[Callable[[Out14], Out15], None] = None, op16: Union[Callable[[Out15], Out16], None] = None, op17: Union[Callable[[Out16], Out17], None] = None, op18: Union[Callable[[Out17], Out18], None] = None, op19: Union[Callable[[Out18], Out19], None] = None, /) -> Callable[..., Any]:  # type: ignore
     """
     Pipeline takes up to 20 functions and composites them into a single function.
     """

@@ -22,7 +22,7 @@ from ast import (
 from inspect import getsource
 from itertools import takewhile
 from textwrap import dedent
-from typing import (Any, Callable, {% if param_spec == 1 %}ParamSpec,{% endif %} TypeVar, overload)
+from typing import (Any, Union, Callable, {% if param_spec == 1 %}ParamSpec,{% endif %} TypeVar, overload)
 
 
 {% if param_spec == 1 %}
@@ -46,8 +46,8 @@ class _LambdaExtractor(NodeTransformer):
     def __init__(
         self,
         _lambda: Lambda,
-        value: expr | Call,
-        subsequent_value: expr | Call | None = None,
+        value: Union[expr, Call],
+        subsequent_value: Union[expr, Call, None] = None,
     ):
         self._lambda = _lambda
         self.arg_name = self._lambda.args.args[0].arg  # type: ignore
@@ -278,7 +278,7 @@ InputVal = TypeVar("InputVal")
 
 # Always overridden by the overloads but is
 # self consistent in the declared function 
-stand_in_callable = Callable[..., Any] | None
+stand_in_callable = Union[Callable[..., Any], None]
 
 {% for n in range(arg_limit) %}
 Out{{n}} = TypeVar("Out{{n}}"){% endfor %}
@@ -337,7 +337,7 @@ def pipeline(
 {% endfor %}
 
 
-def pipeline(op0: Callable[{{ip_ref}}, Out0]{% for n in range(1,arg_limit)%}, op{{n}}: Callable[[Out{{n-1}}], Out{{n}}] | None = None{% endfor %},/) -> Callable[{{ip_ref}}, Any]:  # type: ignore
+def pipeline(op0: Callable[{{ip_ref}}, Out0]{% for n in range(1,arg_limit)%}, op{{n}}: Union[Callable[[Out{{n-1}}], Out{{n}}], None] = None{% endfor %},/) -> Callable[{{ip_ref}}, Any]:  # type: ignore
     """
     Pipeline takes up to {{arg_limit}} functions and composites them into a single function.
     """
