@@ -2,7 +2,7 @@
 name = "function-pipes"
 version = "0.1.0"
 description = "Typed python equivalent for R pipes."
-authors = ["Alex Parsons <alex.parsons@mysociety.org>"]
+authors = ["Alex Parsons <alex@alexparsons.co.uk>"]
 readme = "README.md"
 license = "MIT"
 homepage = "https://github.com/ajparsons/function-pipes"
@@ -11,9 +11,12 @@ include = [
     "LICENSE.md",
 ]
 
-
 [tool.poetry.dependencies]
 python = "^3.8"
+
+[tool.poetry.group.dev.dependencies]
+j2cli = "^0.3.10"
+pytest-pyright = "^0.0.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"

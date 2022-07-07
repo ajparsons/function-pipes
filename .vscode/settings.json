@@ -21,6 +21,7 @@
         "**/__pycache__": true
     },
     "files.associations": {
+        "**/*.jinja-py": "jinja-py",
         "**/*.html": "html",
         "**/templates/**/*.html": "django-html",
         "**/templates/**/*": "django-txt",

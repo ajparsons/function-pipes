@@ -1,0 +1,349 @@
+"""
+Module docstring
+"""
+{% set arg_limit = arg_limit|int %}
+{% set param_spec = param_spec|int %}
+# pylint: disable=line-too-long
+
+from ast import (
+    Call,
+    Lambda,
+    Load,
+    Name,
+    NamedExpr,
+    NodeTransformer,
+    NodeVisitor,
+    Store,
+    expr,
+    increment_lineno,
+    parse,
+    walk,
+)
+from inspect import getsource
+from itertools import takewhile
+from textwrap import dedent
+from typing import (Any, Callable, {% if param_spec == 1 %}ParamSpec,{% endif %} TypeVar, overload)
+
+
+{% if param_spec == 1 %}
+InputParams = ParamSpec("InputParams")
+P = ParamSpec("P")
+{% set ip_ref = "InputParams" %}
+{% set ip_args = "InputParams.args" %}
+{% set ip_kwargs = "InputParams.kwargs" %}
+{% else %}
+{% set ip_ref = "..." %}
+{% set ip_args = "Any" %}
+{% set ip_kwargs = "Any" %}
+{% endif %}
+T = TypeVar("T")
+
+class _LambdaExtractor(NodeTransformer):
+    """
+    Replace references to the lambda argument with the passed in value
+    """
+
+    def __init__(
+        self,
+        _lambda: Lambda,
+        value: expr | Call,
+        subsequent_value: expr | Call | None = None,
+    ):
+        self._lambda = _lambda
+        self.arg_name = self._lambda.args.args[0].arg  # type: ignore
+        self.visit_count = 0
+        self.value = value
+        self.subsequent_value = subsequent_value
+
+    def extract_and_replace(self):
+        """
+        Return what the lambda does, but replaces
+        references to the lambda arg with
+        the passed in value
+        """
+        self.visit(self._lambda.body)
+        return self._lambda.body
+
+    def visit_Name(self, node: Name):
+        """
+        Replace the internal lambda arg reference with the given value
+        If a subsequent value given, replace all values after the first with that
+        This allows assigning using a walrus in the first value, and then
+        using that value without recalculation in the second.
+        """
+        if node.id == self.arg_name:
+            if self.visit_count == 0:
+                self.visit_count += 1
+                return self.value
+            if self.subsequent_value:
+                return self.subsequent_value
+            else:
+                raise ValueError("This lambda contains multiple references to the arg")
+        return node
+
+
+def copy_position(source: expr, destination: expr):
+    """
+    Copy the position information from one AST node to another
+    """
+    destination.lineno = source.lineno
+    destination.end_lineno = source.end_lineno
+    destination.col_offset = source.col_offset
+    destination.end_col_offset = source.end_col_offset
+
+
+class _CountLambdaArgUses(NodeVisitor):
+    """
+    Count the number of uses of the first argument in the lambda
+    in the lambda definition
+    """
+
+    def __init__(self, _lambda: Lambda):
+        self._lambda = _lambda
+        self.arg_name = self._lambda.args.args[0].arg  # type: ignore
+        self.uses: int = 0
+
+    def check(self) -> int:
+        """
+        Get the number of times the arugment is referenced
+        """
+        self.visit(self._lambda.body)  # type: ignore
+        return self.uses
+
+    def visit_Name(self, node: Name):
+        """
+        Increment the uses count if the name is the given arg
+        """
+        if node.id == self.arg_name:
+            self.uses += 1
+        self.generic_visit(node)
+
+
+class _PipeTransformer(NodeTransformer):
+    """
+    A NodeTransformer that rewrites the code tree so that all references to replaced with
+    a set of nested function calls.
+
+    a = pipe(a,b,c,d)
+
+    becomes
+
+    a = d(c(b(a)))
+
+    This also expands lambdas so that there is no function calling overhead.
+
+    a = pipe(a,b,c,lambda x: x+1)
+
+    becomes:
+
+    a = (c(b(a))) + 1
+
+    Where there are multiple uses of the argument in a lambda,
+    a walrus is used to avoid duplication calculations.
+
+    a = pipe(a,b,c,lambda x: x + x + 1)
+
+    becomes:
+
+    a = (var := c(b(a))) + var + 1
+
+    """
+
+    def visit_Call(self, node: Call) -> Any:
+        """
+        Replace all references to the pipe function with nested function calls.
+        """
+        if node.func.id == "pipe":  # type: ignore
+            value = node.args[0]
+            funcs = node.args[1:]
+
+            # unpack the functions into nested calls
+            # unless the function is a lambda
+            # in which case, the lambda's body
+            # needs to be unpacked
+            for func in funcs:
+                if isinstance(func, Lambda):
+                    arg_usage = _CountLambdaArgUses(func).check()
+                    if arg_usage == 0:
+                        # this will throw an error at build time rather than runtime
+                        # but shouldn't be a surprise to typecheckers
+                        raise ValueError("This lambda has no arguments.")
+                    elif arg_usage == 1:
+                        # if the lambda only uses the argument once
+                        # can just substitute the arg in the lambda
+                        # with the value in the loop
+                        # e.g. a = pipe(5, lambda x: x + 1)
+                        # becomes a = 5 + 1
+                        value = _LambdaExtractor(func, value).extract_and_replace()
+                    elif arg_usage > 1:
+                        # if the lambda uses the argument more than once
+                        # have to assign the value to a variable first
+                        # (using a walrus)
+                        # and then use the variable in the lambda in subsequent calls.
+                        # e.g. a = pipe(5, lambda x: x + x + 1)
+                        # becomes a = (var := 5) + var + 1
+                        # NamedExpr is how := works behind the scenes.
+                        walrus = NamedExpr(
+                            target=Name(id="_pipe_temp_var", ctx=Store()), value=value
+                        )
+                        walrus.lineno = func.lineno
+                        copy_position(func, walrus)
+                        temp_var = Name(id="_pipe_temp_var", ctx=Load())
+                        copy_position(func, temp_var)
+                        value = _LambdaExtractor(
+                            func, walrus, temp_var
+                        ).extract_and_replace()
+                else:
+                    # if just a function, we're just building a nesting call chain
+                    value = Call(func, [value], [])
+                copy_position(func, value)
+            return value  # type: ignore
+        return self.generic_visit(node)
+
+
+def fast_pipes(func: Callable[{% if param_spec == 1%}P{% else %}...{% endif %}, T]) -> Callable[{% if param_spec == 1%}P{% else %}...{% endif %}, T]:
+    """
+    Decorator function that replaces references to pipe with
+    the direct equivalent of the pipe function.
+    """
+
+    # This approach adapted from
+    # adapted from https://github.com/robinhilliard/pipes/blob/master/pipeop/__init__.py
+    ctx = func.__globals__
+    first_line_number = func.__code__.co_firstlineno
+
+    source = getsource(func)
+
+    # AST data structure representing parsed function code
+    tree = parse(dedent(source))
+
+    # Fix line and column numbers so that debuggers still work
+    increment_lineno(tree, first_line_number - 1)
+    source_indent = sum([1 for _ in takewhile(str.isspace, source)]) + 1
+
+    for node in walk(tree):
+        if hasattr(node, "col_offset"):
+            node.col_offset += source_indent
+
+    # Update name of function or class to compile
+    tree.body[0].name += "_fast_pipe"  # type: ignore
+
+    # remove the pipe decorator so that we don't recursively
+    # call it again. The AST node for the decorator will be a
+    # Call if it had braces, and a Name if it had no braces.
+    # The location of the decorator function name in these
+    # nodes is slightly different.
+    tree.body[0].decorator_list = [  # type: ignore
+        d
+        for d in tree.body[0].decorator_list  # type: ignore
+        if isinstance(d, Call)
+        and d.func.id != "fast_pipes"  # type: ignore
+        or isinstance(d, Name)
+        and d.id != "fast_pipes"
+    ]
+
+    # Apply the visit_Call transformation
+    tree = _PipeTransformer().visit(tree)
+
+    # now compile the AST into an altered function or class definition
+    try:
+        code = compile(
+            tree,
+            filename=(ctx["__file__"] if "__file__" in ctx else "repl"),
+            mode="exec",
+        )
+    except SyntaxError as e:
+        # The syntax is rearranged in a way that triggers a starred error correctly
+        # Easier to adjust the error here than figure out how to raise it properly
+        # in the AST visitor.
+        # This is a bit hacky, but it's good enough for now.
+        if e.msg == "can't use starred expression here" and (
+            e.text and "pipe(" in e.text
+        ):
+            e.msg = "pipe can't take a starred expression as an argument when fast_pipes is used."
+        raise e
+
+    # and execute the definition in the original context so that the
+    # decorated function can access the same scopes as the original
+    exec(code, ctx)
+
+    # return the modified function or class - original is nevers called
+    return ctx[tree.body[0].name]
+
+
+
+
+BridgeType = TypeVar("BridgeType")
+InputVal = TypeVar("InputVal")
+
+# Always overridden by the overloads but is
+# self consistent in the declared function 
+stand_in_callable = Callable[..., Any] | None
+
+{% for n in range(arg_limit) %}
+Out{{n}} = TypeVar("Out{{n}}"){% endfor %}
+
+def pipe_bridge(func: Callable[[BridgeType], Any]
+) -> Callable[[BridgeType], BridgeType]:
+    """
+    When debugging, you might want to use a function to see
+    the current value in the pipe, but examination functions.
+    may not return the value to let it continue down the chain.
+    This wraps the function so that it does it's job, and then
+    returns the original value to conitnue down the chain.
+    For instance:
+    ```
+    bridge(rich.print)
+    ```
+    Will use the rich library's print function to look at the value,
+    but then unlike calling `rich.print` directly in the pipe,
+    will return the value to let it continue.
+    """
+
+    def _inner(value: BridgeType) -> BridgeType:
+        func(value)
+        return value
+
+    return _inner
+
+{% for n in range(1, arg_limit) %}
+@overload
+def pipe(
+    value: InputVal,
+    op0: Callable[[InputVal], Out0],{% for x in range(n-1) %}
+    op{{ x + 1 }}: Callable[[Out{{x}}], Out{{x+1}}],{% endfor %}
+    /
+) -> Out{{n-1}}:
+    ...
+{% endfor %}
+
+def pipe(value: Any{% for n in range(arg_limit)%}, op{{n}}: stand_in_callable = None{% endfor %},/) -> Any:  # type: ignore
+    """
+    Pipe takes up to {{arg_limit}} functions and applies them to a value.
+    """
+    {% for n in range(arg_limit + 1)%}
+    {% if n == arg_limit %}else{%else%}{% if n > 0 %}el{% endif %}if not op{{n}}{% endif %}:
+        return {% for x in range(n)|reverse %}op{{x}}({% endfor %}value{% for x in range(n) %}){%endfor%} # fmt: skip
+    {% endfor %}
+
+{% for n in range(1, arg_limit) %}
+@overload
+def pipeline(
+    op0: Callable[{{ip_ref}}, Out0],{% for x in range(n-1) %}
+    op{{ x + 1 }}: Callable[[Out{{x}}], Out{{x+1}}],{% endfor %}
+    /
+) -> Callable[{{ip_ref}},Out{{n-1}}]:
+    ...
+{% endfor %}
+
+
+def pipeline(op0: Callable[{{ip_ref}}, Out0]{% for n in range(1,arg_limit)%}, op{{n}}: Callable[[Out{{n-1}}], Out{{n}}] | None = None{% endfor %},/) -> Callable[{{ip_ref}}, Any]:  # type: ignore
+    """
+    Pipeline takes up to {{arg_limit}} functions and composites them into a single function.
+    """
+    {% for n in range(1,arg_limit+1)%}
+    {% if n == arg_limit %}else{%else%}{% if n > 1 %}el{% endif %}if not op{{n}}{% endif %}:
+        def _inner{{n-1}}(*args:{{ip_args}}, **kwargs:{{ip_kwargs}}) -> Out{{n-1}}:
+                return {% for x in range(n)|reverse %}op{{x}}({% endfor %}*args, **kwargs{% for x in range(n) %}){%endfor%}  # fmt: skip
+        return _inner{{n-1}}
+    {% endfor %}

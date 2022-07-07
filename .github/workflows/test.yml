@@ -45,6 +45,8 @@ jobs:
 
     - name: Test with pyright
       uses: jakebailey/pyright-action@v1
+      with:
+        extra-args: src
 
     - name: Test with black
       uses: psf/black@stable
