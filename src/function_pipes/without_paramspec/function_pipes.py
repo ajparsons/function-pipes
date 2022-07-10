@@ -1182,3 +1182,12 @@ def pipeline(op0: Callable[..., Out0], op1: Union[Callable[[Out0], Out1], None] 
             return op19(op18(op17(op16(op15(op14(op13(op12(op11(op10(op9(op8(op7(op6(op5(op4(op3(op2(op1(op0(*args, **kwargs))))))))))))))))))))  # fmt: skip
 
         return _inner19
+
+
+def arbitary_length_pipe(value: Any, *funcs: Callable[[Any], Any]) -> Any:
+    """
+    Pipe that takes an arbitary amount of functions.
+    """
+    for func in funcs:
+        value = func(value)
+    return value

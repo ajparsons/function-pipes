@@ -347,3 +347,12 @@ def pipeline(op0: Callable[{{ip_ref}}, Out0]{% for n in range(1,arg_limit)%}, op
                 return {% for x in range(n)|reverse %}op{{x}}({% endfor %}*args, **kwargs{% for x in range(n) %}){%endfor%}  # fmt: skip
         return _inner{{n-1}}
     {% endfor %}
+
+
+def arbitary_length_pipe(value: Any, *funcs: Callable[[Any], Any]) -> Any:
+    """
+    Pipe that takes an arbitary amount of functions.
+    """
+    for func in funcs:
+        value = func(value)
+    return value
