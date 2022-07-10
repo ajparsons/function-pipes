@@ -1,8 +1,16 @@
 """
-Module docstring
+function-pipe
+
+Functions for pipe syntax in Python.
+
+
+Version using ParamSpec for Python 3.10 +
+
+Read more at https://github.com/ajparsons/function-pipes
+
+Licence: MIT
+
 """
-
-
 # pylint: disable=line-too-long
 
 from ast import (

@@ -1,24 +1,24 @@
-"""
-Module docstring
-"""
 {% set arg_limit = arg_limit|int %}
 {% set param_spec = param_spec|int %}
+"""
+function-pipe
+
+Functions for pipe syntax in Python.
+
+{% if param_spec == 1 %}
+Version using ParamSpec for Python 3.10 +
+{% else %}
+Version without ParamSpec for Python 3.8-3.9.
+{% endif %}
+Read more at https://github.com/ajparsons/function-pipes
+
+Licence: MIT
+
+"""
 # pylint: disable=line-too-long
 
-from ast import (
-    Call,
-    Lambda,
-    Load,
-    Name,
-    NamedExpr,
-    NodeTransformer,
-    NodeVisitor,
-    Store,
-    expr,
-    increment_lineno,
-    parse,
-    walk,
-)
+from ast import (Call, Lambda, Load, Name, NamedExpr, NodeTransformer,
+                 NodeVisitor, Store, expr, increment_lineno, parse, walk)
 from inspect import getsource
 from itertools import takewhile
 from textwrap import dedent

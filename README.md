@@ -94,10 +94,10 @@ There is a limit of 20 functions that can be passed to a pipe or pipeline. If yo
 
 You can install from pip: `python -m pip install function-pipes`
 
-Or you can copy the function directly into your projects.
+Or you can copy the module directly into your projects.
 
-* For python 3.10+: [with_paramspec/function_pipes.py](/src/function_pipes/with_paramspec/function_pipes.py)
-* For python 3.8, 3.9: [without_paramspec/function_pipes.py](/src/function_pipes/without_paramspec/function_pipes.py)
+* For python 3.10+: [with_paramspec/function_pipes.py](https://github.com/ajparsons/function-pipes/src/function_pipes/with_paramspec/function_pipes.py)
+* For python 3.8, 3.9: [without_paramspec/function_pipes.py](https://github.com/ajparsons/function-pipes/src/function_pipes/without_paramspec/function_pipes.py)
 
 ## Development
 
