@@ -9,4 +9,4 @@ RUN curl -sSL https://install.python-poetry.org | python - && \
     poetry self update --preview && \
     poetry self add poetry-bumpversion && \
     poetry install && \
-    echo "/workspaces/function_pipes/src/" > /usr/local/lib/python3.10/site-packages/function_pipes.pth
+    echo "/workspaces/function-pipes/src/" > /usr/local/lib/python3.10/site-packages/function_pipes.pth
