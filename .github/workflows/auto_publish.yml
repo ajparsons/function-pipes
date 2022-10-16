@@ -51,20 +51,14 @@ jobs:
          package_name: ${{ steps.repo_name.outputs.repo_name }}
 
       - name: Update git tags
-        if: ${{ steps.get_status.outputs.pypi_package_exists == 'true' && steps.get_status.outputs.pypi_version_difference == 'true'}}
-        run: |
-            git config --global user.email "action@github.com"
-            git config --global user.name "GitHub Action"
-            git tag -f -a -m "Latest release" "latest"
-            for val in $TAGS; do
-              git tag -f -a -m "Release for $val" "$val"
-            done
-            git push -f --tags
-        env:
-          TAGS: ${{ steps.get_status.outputs.repo_poetry_version_tags }}
+        if: ${{ steps.get_status.outputs.pypi_version_difference == 'true' }}
+        uses: ajparsons/semver-to-tag@main
+        with:
+          semver: ${{ steps.get_status.outputs.repo_poetry_version }}
+          update_tags: true
 
       - name: Build and publish to pypi
-        if: ${{ steps.get_status.outputs.pypi_package_exists == 'true' && steps.get_status.outputs.pypi_version_difference == 'true'}}
+        if: ${{ steps.get_status.outputs.pypi_version_difference == 'true'}}
         uses: JRubics/poetry-publish@v1.11
         with:
           pypi_token: ${{ secrets.PYPI_TOKEN }}
