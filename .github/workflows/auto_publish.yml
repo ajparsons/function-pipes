@@ -51,7 +51,7 @@ jobs:
          package_name: ${{ steps.repo_name.outputs.repo_name }}
 
       - name: Update git tags
-        if: ${{ steps.get_status.outputs.pypi_version_difference == 'true' }}
+        # if: ${{ steps.get_status.outputs.pypi_version_difference == 'true' }}
         uses: ajparsons/semver-to-tag@main
         with:
           semver: ${{ steps.get_status.outputs.repo_poetry_version }}
