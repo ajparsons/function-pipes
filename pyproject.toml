@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "function-pipes"
-version = "0.1.1"
+version = "0.1.2"
 description = "Typed python equivalent for R pipes."
 authors = ["Alex Parsons <alex@alexparsons.co.uk>"]
 readme = "README.md"
