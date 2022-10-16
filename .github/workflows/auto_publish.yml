@@ -40,8 +40,9 @@ jobs:
 
       - name: Fetch repo name
         id: repo_name
-        run: |
-          echo "repo_name=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')" >> $GITHUB_OUTPUT
+        uses: ajparsons/action-repo-name@main
+        with: 
+          github_repo: ${{ github.repository }}
       
       - id: get_status
         name: get_status
